@@ -2,6 +2,7 @@
 here = fileparts(mfilename('fullpath'));                  % this folder
 addpath(fullfile(here, 'calm_ride'));                     % Calm Ride controller files
 addpath(fullfile(here, 'rider_screen'));                  % rider screen files
+addpath(fullfile(here, 'taxi'));                          % taxi controller, sign shape check, lap simulation
 addpath(genpath(fullfile(here, 'baseline')));             % Quanser baseline (for reading/testing)
 
 rel = version('-release');                                % e.g. '2026a'
@@ -21,8 +22,8 @@ for p = nice
     fprintf('  [%s] %s (optional: vision on saved frames)\n', ifelse(any(have == p)), p);
 end
 
-fprintf('\n1) Rider screen demo...\n');
-rider_screen(make_fake_run());                            % plays the fake ride
+fprintf('\n1) One lap on the QLabs map, rider screen...\n');
+replay_ride(simulate_lap('ours'), 2);                     % our taxi, simulated from the model's logic
 
 if any(have == "Simulink")
     fprintf('\n2) Building the Calm Ride test model...\n');

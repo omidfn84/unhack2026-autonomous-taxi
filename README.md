@@ -16,20 +16,32 @@ Built on top of the Quanser QCar2 self-driving stack (MATLAB, Simulink, QLabs):
 
 | Feature | What the rider gets | How it works |
 |---|---|---|
-| **Calm Ride** | Smooth, predictable stops and starts | Constant-deceleration braking curve (`v = √(2·a·d)`) + rate limiter + low-pass filter for jerk limiting |
-| **Pedestrian yield** | The car visibly slows, waits and resumes for people | Depth-camera obstacle distance feeds the Calm Ride braking curve |
-| **"Why am I stopping?" screen** | Plain-language status: what the car sees and why it is stopping | Status logic turns live vehicle signals into rider messages |
+| **Pickup and drop-off** | The taxi stops at the curb, waits, then leaves | `taxi_controller.m`: approach → wait → leave (kickoff slide 17) |
+| **Calm Ride** | Smooth, predictable stops and starts | Constant-deceleration braking curve (`v = √(2·a·d)`) + rate limiter + jerk filter |
+| **Stop at the line** | Full stop beside the stop sign, not 1.2 m early | Uses the HSV blob's measured depth as the braking target |
+| **Stop vs yield** | No needless stops at yield signs | `classify_red_sign.m`: blob fill (octagon vs triangle ring) and width/height |
+| **Rider screen** | Status, next turn and distance, route, what the camera sees | `rider_screen/` driven by the controller's status code |
 
-### Results (simulation)
-Compared with the baseline on/off stop logic, Calm Ride cut peak braking ~16× (3.96 → 0.25 m/s²)
-and peak jerk ~240×, while still stopping within ~1 cm of the target. *(Python model; re-measure in QLabs.)*
+### What the provided stack does on a lap (from the model, `simulate_lap('base')`)
+Drives path 4 (outer lap) from the taxi hub at 0.5 m/s, slows in turns by cos(steering)^10,
+and stops 2 s whenever the HSV pipeline sees a red blob ≥ 100 px within 1.2 m. That includes
+yield signs and a stop sign that faces another road. Peak braking about 2 m/s² in our lap simulation.
+
+### Our taxi on the same lap (`simulate_lap('ours')`)
+Picks up at the curb, stops with its front at the stop sign, slows past yield signs, drops off at
+the hub. Peak braking about 0.4 m/s², 0 harsh jolts. *(Simulation from the model's numbers; re-measure in QLabs.)*
 
 ## Repo layout
 ```
-calm_ride/          Calm Ride braking controller + Mac-friendly Simulink test model builder
-rider_screen/       Rider status screen (MATLAB uifigure) + fake and real ride loaders
+taxi/               taxi_controller (pickup/drop-off + Calm Ride + stop at line), classify_red_sign,
+                    route_guidance, scenario_objects, simulate_lap (Mac), calibrate_sign_shapes
+rider_screen/       Rider screen on the QLabs map: rider_screen_qlabs/update, replay_ride,
+                    load_qlabs_run, rider_screen_live (live during a run)
+calm_ride/          Calm Ride braking curve + Mac-friendly Simulink test model builder
+demo/               calm_ride_lap.html: the same lap as an interactive web page
 baseline/           Quanser self-driving stack (unhack2026 branch) — team edits go here
 setup_unhack.m      One-time setup: checks toolboxes, sets path, runs the demos
+run_lap_demo.m      Simulate one lap (provided stack and ours) and play it on the rider screen
 ```
 
 ## Getting started
@@ -41,10 +53,34 @@ setup_unhack            % checks toolboxes, plays the rider screen, builds + run
 **Windows + QLabs (full stack):** follow the Quanser guide in `baseline/`, then open
 `Virtual_Setup_Competition_Map.m` and run the model.
 
-### Logging a real run for the rider screen
-Mux `[speed, stop_flag, phase, distanceToObstacle, stopLineDistance, distanceToGoal]` into a
-**To Workspace** block named `riderLog` (Structure With Time, sample time 0.1), run, then
-`save('run1.mat','out')`. Play it with `rider_screen(load_real_run('run1.mat'), 1)`.
+**Mac (no QLabs):** `run_lap_demo` simulates the lap and plays it on the rider screen.
+
+## Wiring our logic into the Simulink model (Windows + QLabs)
+1. **Measure the stops.** In QLabs, use the Coordinate Helper on the pickup and drop-off curbs and put
+   the x, y values in `taxi_config.m` and at the top of `taxi_controller.m`.
+2. **Sign shape.** Inside `HSVStopSignDetection/findStopSignLocation`, add a MATLAB Function block with
+   `classify_red_sign.m`. Inputs: `imageBinary` (from colorThresholdingHSV), `blobLocation (px) [2]`,
+   `blobFound?`. Send its `shape` output out with a Goto tag `signShape`.
+3. **Sign depth.** Inside `HSVStopSignDetection`, add a Goto tag `distanceToSign` on the
+   `findStopSignDistance` output.
+4. **Taxi controller.** Inside `speedController`, replace `stopSignDetectionSpeedAdjust` with a MATLAB
+   Function block holding `taxi_controller.m`. Inputs: currentPose x and y, measuredSpeed, the speed
+   that used to go into stopSignDetectionSpeedAdjust, stopSignDetection, distanceToSign, signShape,
+   a Clock, Constant `Controller_Sample_Time`, Constants `path_x4` and `path_y4`. Its `speedCmd` goes
+   where `speedOut` went. (Goto tags are local by default: add inports to speedController, or set the
+   tags' visibility to global.)
+5. **Rider screen.** Either add a MATLAB Function block with `rider_screen_live.m` (live, Normal mode),
+   or log a run and replay it (below).
+
+### Logging a run for the rider screen
+Mux these 10 signals, in order, into a **To Workspace** block named `riderLog` (Structure With Time,
+sample time 0.05): `x, y, heading` (currentPose), `measuredSpeed`, `phase, dGoal, status`
+(taxi_controller), `stopSignDetection`, `distanceToSign`, `signShape`. Run, then
+`save('run1.mat','out')` and play it with `replay_ride(load_qlabs_run('run1.mat'), 1)`.
+
+### Tuning the stop/yield check
+Log `imageBinary`, `blobLocation` and `blobFound?` (see `calibrate_sign_shapes.m`), drive past one
+stop sign and one yield sign, run the script, and set the fill thresholds between the two groups.
 
 ## Team workflow
 - Pull before you start: `git pull`
@@ -57,4 +93,5 @@ Mux `[speed, stop_flag, phase, distanceToObstacle, stopLineDistance, distanceToG
 
 ## Credits
 Baseline self-driving stack and QLabs by [Quanser](https://github.com/quanser/student-competition-resources-matlab/tree/unhack2026).
-MATLAB and Simulink by MathWorks. Files in `baseline/` belong to Quanser.
+MATLAB and Simulink by MathWorks. Files in `baseline/` and the map image in `rider_screen/map_bg.png`
+(QLabs top view from the UNHACK 2026 kickoff deck) belong to Quanser.
