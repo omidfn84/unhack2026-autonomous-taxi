@@ -1,0 +1,21 @@
+# MATLAB / Simulink build and cache files
+*.asv
+*.autosave
+*.slxc
+*.mexmaci64
+*.mexmaca64
+*.mexw64
+slprj/
+codegen/
+*_grt_rtw/
+*_ert_rtw/
+*.slx.r20*
+
+# Logged runs and large data (share via Drive instead)
+run*.mat
+*.mp4
+*.mov
+
+# OS clutter
+.DS_Store
+Thumbs.db
