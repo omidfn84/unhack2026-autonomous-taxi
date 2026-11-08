@@ -34,6 +34,15 @@ else
     set(H.ring, 'XData', NaN, 'YData', NaN);
 end
 
+% traffic lights: red/yellow or green from the scenario's light cycle
+for k = 1:numel(H.lightDots)
+    if traffic_light_state(H.lights(k, 1), st.t, cfg.lightOffset)
+        H.lightDots(k).MarkerFaceColor = [0.90 0.28 0.30];
+    else
+        H.lightDots(k).MarkerFaceColor = [0.18 0.66 0.42];
+    end
+end
+
 % rider text
 [msg, sub, color] = status_message(st);
 H.status.Text = msg; H.sub.Text = sub; H.lamp.Color = color;
@@ -59,6 +68,7 @@ if st.t > H.lastT
     if st.t > cfg.armTime, H.peak = max(H.peak, -acc); end
 end
 H.lastV = st.v; H.lastT = st.t;
-H.comfort.Text = sprintf('t = %.1f s   ·   peak braking %.2f m/s^2', st.t, H.peak);
+H.comfort.Text = sprintf('t = %.1f s   ·   %s route   ·   ride feel: %s   ·   peak braking %.2f m/s^2', ...
+    st.t, R.route, cfg.feelName, H.peak);
 drawnow limitrate
 end

@@ -9,8 +9,8 @@ elseif phase <= 1
 else
     goal = R.sDrop; goalName = 'drop-off';
 end
-if phase == 4, mainText = 'Ride complete'; distText = ''; thenText = ''; return; end
-if phase == 2, mainText = 'Picking you up'; distText = ''; thenText = ['Then drop-off in ' m(R.sDrop - s)]; return; end
+if strcmp(mode, 'ours') && phase == 4, mainText = 'Ride complete'; distText = ''; thenText = ''; return; end
+if strcmp(mode, 'ours') && phase == 2, mainText = 'Picking you up'; distText = ''; thenText = ['Then drop-off in ' m(R.sDrop - s)]; return; end
 
 starts = [R.turns.start];
 k = find(starts > s + 0.02 & starts < goal, 1);           % next turn before the goal

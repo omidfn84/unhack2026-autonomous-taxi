@@ -3,7 +3,10 @@ function replay_ride(ride, speedup)
 %   replay_ride(simulate_lap('ours'))            % Mac, no QLabs needed
 %   replay_ride(load_qlabs_run('run1.mat'), 1)   % a logged QLabs run
 if nargin < 2, speedup = 2; end
-H = rider_screen_qlabs(ride.mode);
+route = []; feel = 3;                                     % rides from simulate_lap carry their route and feel
+if isfield(ride, 'route'), route = ride.route; end
+if isfield(ride, 'feel'), feel = ride.feel; end
+H = rider_screen_qlabs(ride.mode, route, feel);
 t0 = tic;                                                 % wall clock for playback
 k = 1; n = numel(ride.t);
 while k <= n && isvalid(H.fig)

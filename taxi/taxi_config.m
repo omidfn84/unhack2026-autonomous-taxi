@@ -1,9 +1,20 @@
-function cfg = taxi_config()
-% TAXI_CONFIG  One place for every number our taxi uses.
+function cfg = taxi_config(route, feel)
+% TAXI_CONFIG  One place for every number RideTune uses.
+%   cfg = taxi_config()                   % last route picked (or 'cheapest'), Normal ride feel
+%   cfg = taxi_config('fastest', 1)       % route 'fastest' | 'scenic' | 'cheapest', feel 1 (Turtle) .. 5 (Rabbit)
 % Values marked MODEL come from the provided Simulink model / setup scripts.
 % Values marked MEASURE must be replaced with QLabs Coordinate Helper readings.
 
-% ---- route (MODEL: pathPlanner uses path 4, the outer lap) ----
+% ---- rider choices ----
+if nargin < 1 || isempty(route)
+    route = getappdata(0, 'RideTuneRoute');               % route picked earlier with apply_route
+    if isempty(route), route = 'cheapest'; end
+end
+if nargin < 2 || isempty(feel), feel = 3; end             % 3 = Normal
+cfg.route = route;                                        % 'fastest' (path 2), 'scenic' (path 7), 'cheapest' (path 4)
+cfg.feel = feel;                                          % turtle (1) to rabbit (5)
+
+% ---- lane path (MODEL: pathPlanner uses path 4, the outer lap) ----
 P = load('SDCS_Paths_7.mat', 'path_x4', 'path_y4');      % lane path the stack follows
 cfg.path_x = P.path_x4(:);                                % x of every path point (m)
 cfg.path_y = P.path_y4(:);                                % y of every path point (m)
@@ -31,16 +42,20 @@ cfg.yieldFillMax = 0.50;                                  % ... than a triangle 
 cfg.minAspect    = 0.60;                                  % width/height below this = sign faces another road
 cfg.yieldSpeed   = 0.25;                                  % m/s while passing a yield sign
 
-% ---- Calm Ride (our calm_speed.m numbers) ----
-cfg.calm.a    = 0.15;                                     % braking rate (m/s^2)
+% ---- Calm Ride (our calm_speed.m numbers; a, up, down follow the ride feel) ----
+[cfg.calm.a, cfg.calm.up, cfg.calm.down, cfg.feelName] = ride_feel(feel);   % braking, speed-up, slow-down (m/s^2)
 cfg.calm.lead = 0.02;                                     % start braking 2 cm early
 cfg.calm.vmin = 0.03;                                     % creep speed so the car never stalls short
-cfg.calm.up   = 0.2;                                      % max speed-up rate (m/s^2)
-cfg.calm.down = -0.4;                                     % max slow-down rate (m/s^2)
 cfg.calm.tauF = 0.15;                                     % jerk filter time constant (s)
 
 % ---- camera geometry (MODEL constants + one ASSUMPTION) ----
 cfg.cam.w = 640; cfg.cam.h = 480;                         % RealSense RGB size used by the model
 cfg.cam.hfov = 69.4; cfg.cam.vfov = 42.5;                 % MODEL: field-of-view gains in findStopSignDistance
 cfg.cam.ahead = 0.2;                                      % ASSUMPTION: camera 0.2 m ahead of the pose
+
+% ---- safety layer (app and service features; the car only needs these inputs) ----
+cfg.afterConfirm = 3;                                     % s between "I'm in, I'm alone" and leaving
+cfg.helpAhead    = 0.9;                                   % m: nearest safe spot after "Ask for help"
+cfg.esc = [15 27 39];                                     % s with no "I'm safe": call contact, call again, call 911
+cfg.lightOffset  = 0;                                     % s: shift the light cycle to match your QLabs run
 end

@@ -1,8 +1,13 @@
-function H = rider_screen_qlabs(mode)
+function H = rider_screen_qlabs(mode, route, feel)
 % RIDER_SCREEN_QLABS  Build the rider screen: QLabs map on the left, rider info on the right.
-%   H = rider_screen_qlabs('ours')   then call rider_screen_update(H, st) for every frame.
+%   H = rider_screen_qlabs('ours', 'fastest', 3)   then call rider_screen_update(H, st) for every frame.
+%   route: 'cheapest' | 'fastest' | 'scenic' (default: the last one picked with apply_route)
+%   feel:  1 Turtle .. 5 Rabbit (default 3, Normal)
 if nargin < 1, mode = 'ours'; end
-cfg = taxi_config(); R = route_guidance(cfg); O = scenario_objects();
+if nargin < 2, route = []; end
+if nargin < 3, feel = 3; end
+if strcmp(mode, 'base'), route = 'cheapest'; end              % the original car drives the outer lap
+cfg = taxi_config(route, feel); R = route_guidance(cfg); O = scenario_objects();
 here = fileparts(mfilename('fullpath'));
 img = imread(fullfile(here, 'map_bg.png'));                     % QLabs top view (kickoff deck), car removed
 AF = [-1e-05, -143.09531, -142.72886, -0.00041, 701.27313, 413.53501];   % world (m) -> map pixels, fitted to the lane paths
@@ -10,7 +15,7 @@ toPx = @(x, y) deal(AF(1)*x + AF(2)*y + AF(5), AF(3)*x + AF(4)*y + AF(6));
 kpx = 142.9;                                                    % map pixels per metre
 
 BG = [0.04 0.07 0.13]; PANEL = [0.09 0.13 0.23]; INK = [0.91 0.93 0.97]; MUTED = [0.55 0.61 0.72]; ACCENT = [0.37 0.77 0.96];
-fig = uifigure('Name', 'Calm Ride rider screen', 'Position', [40 60 1360 720], 'Color', BG);
+fig = uifigure('Name', 'RideTune rider screen', 'Position', [40 60 1360 720], 'Color', BG);
 gl = uigridlayout(fig, [1 2], 'ColumnWidth', {'1.25x', '1x'}, 'BackgroundColor', BG, 'Padding', [12 12 12 12]);
 
 % ---------- map ----------
@@ -32,6 +37,11 @@ for k = 1:numel(O.signs)                                                        
         case 'yield', plot(ax, sx, sy, 'v', 'MarkerSize', 11, 'MarkerFaceColor', 'w', 'MarkerEdgeColor', [0.84 0.16 0.16], 'LineWidth', 2.5);
         otherwise,    plot(ax, sx, sy, 'o', 'MarkerSize', 10, 'MarkerFaceColor', [0.12 0.44 0.92], 'MarkerEdgeColor', 'w', 'LineWidth', 1.5);
     end
+end
+H.lightDots = gobjects(size(O.lights, 1), 1);                                    % traffic lights, coloured live
+for k = 1:size(O.lights, 1)
+    [qx, qy] = toPx(O.lights(k, 2), O.lights(k, 3));
+    H.lightDots(k) = plot(ax, qx, qy, 's', 'MarkerSize', 12, 'MarkerFaceColor', [0.18 0.66 0.42], 'MarkerEdgeColor', [0.16 0.18 0.22], 'LineWidth', 2);
 end
 H.ring = plot(ax, NaN, NaN, 'o', 'MarkerSize', 26, 'Color', [1 0.71 0.28], 'LineWidth', 2.5);   % detected sign
 if strcmp(mode, 'ours')
@@ -58,6 +68,7 @@ H.then   = uilabel(side, 'Text', '', 'FontSize', 14, 'FontColor', MUTED);
 H.trip   = uilabel(side, 'Text', '', 'FontSize', 15, 'FontColor', INK);
 H.sees   = uilabel(side, 'Text', '', 'FontSize', 14, 'FontColor', INK, 'WordWrap', 'on');
 H.comfort = uilabel(side, 'Text', '', 'FontSize', 14, 'FontColor', MUTED, 'WordWrap', 'on', 'VerticalAlignment', 'top');
+H.lights = O.lights;                                                               % for the live light colours
 
 H.fig = fig; H.ax = ax; H.R = R; H.cfg = cfg; H.toPx = toPx; H.kpx = kpx; H.mode = mode; H.peak = 0; H.lastV = 0; H.lastT = 0;
 end

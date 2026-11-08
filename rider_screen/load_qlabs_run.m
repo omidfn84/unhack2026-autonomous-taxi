@@ -12,6 +12,8 @@ S = load(file); L = S.out.riderLog;
 d = squeeze(L.signals.values);
 if size(d, 1) ~= numel(L.time), d = d.'; end              % rows = samples
 ride.mode = 'ours';
+ride.route = getappdata(0, 'RideTuneRoute');              % route picked with apply_route before the run
+if isempty(ride.route), ride.route = 'cheapest'; end
 ride.t = L.time(:)'; ride.x = d(:, 1)'; ride.y = d(:, 2)'; ride.h = d(:, 3)'; ride.v = d(:, 4)';
 ride.phase = d(:, 5)'; ride.dGoal = d(:, 6)'; ride.status = d(:, 7)';
 ride.det = d(:, 8)' > 0.5; ride.z = d(:, 9)'; ride.shape = d(:, 10)';
